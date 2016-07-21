@@ -1,0 +1,8 @@
+{% extends "page.html" %}
+{% block content %}
+  {% if more_info %}
+  <p>{{ more_info }}</p>
+  {% endif %}
+  <p>Info</p>
+  <pre>{{ info }}</pre>
+{% endblock %}

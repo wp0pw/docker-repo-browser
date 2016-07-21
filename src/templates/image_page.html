@@ -1,0 +1,15 @@
+{% extends "page.html" %}
+{% block extra_headers %}
+<script type="text/javascript" src="/res/delete.js"></script>
+{% endblock %}
+{% block content %}
+  <p>{{ parent_item_name }}Tags:</p>
+  {% for item in items %}
+    <a class="itemList" href="{{ item.href }}">{{ item.name }}</a><br/>
+  {% endfor %}
+  <p>Delete this Image and all associated Tags:</p>
+  <form action="{{ request.path }}/del" method="post">
+      <button class="confirmYesNo" data-confirm="This will delete this image, you sure you want to do it?"
+              type="submit">Delete</button>
+  </form>
+{% endblock %}
