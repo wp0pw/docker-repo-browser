@@ -58,6 +58,7 @@ pre {
     padding: 2em 2em 2em 2em;
     border: black solid 3px;
     background: white;
+    display: inline-block;
 }
 
 button,

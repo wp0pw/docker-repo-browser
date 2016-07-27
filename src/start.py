@@ -36,41 +36,123 @@ def get_common_actions():
     actions.append(Action('/tree/', 'Tree view', 'Tree view'))
     return actions
 
-NAMESPEC = 'library'
-REPOADDRESS = 'xxx'
+NAMESPACE = 'library'
+REPOADDRESS = 'localhost'
+REPO_FLAVOUR = 2
+
+
+class EndpointProvider:
+
+    @staticmethod
+    def base_endpoint():
+        if REPO_FLAVOUR == 1:
+            return '{}/v1/_ping'.format(REPOADDRESS)
+        elif REPO_FLAVOUR == 2:
+            return '{}/v2/'.format(REPOADDRESS)
+
+    @staticmethod
+    def img_detail_endpoint(image_name):
+        if REPO_FLAVOUR == 1:
+            return '{}/v1/repositories/{}/{}/tags'.format(REPOADDRESS, NAMESPACE, image_name)
+        elif REPO_FLAVOUR == 2:
+            return '{}/v2/{}/tags/list'.format(REPOADDRESS, image_name)
+
+    @staticmethod
+    def tag_detail_endpoint(image_name, tag_name):
+        if REPO_FLAVOUR == 1:
+            return '{}/v1/repositories/{}/{}/tags/{}'.format(REPOADDRESS, NAMESPACE, image_name, tag_name)
+        elif REPO_FLAVOUR == 2:
+            return '{}/v2/{}/manifests/{}'.format(REPOADDRESS, image_name, tag_name)
+
+    @staticmethod
+    def tag_image_detail_endpoint(tag_id, image_name, tag_name):
+        if REPO_FLAVOUR == 1:
+            return '{}/v1/images/{}/json'.format(REPOADDRESS, NAMESPACE, tag_id)
+        elif REPO_FLAVOUR == 2:
+            return '{}/v2/{}/manifests/{}'.format(REPOADDRESS, image_name, tag_name)
+
+    @staticmethod
+    def image_list_endpoint():
+        if REPO_FLAVOUR == 1:
+            return '{}/v1/search'.format(REPOADDRESS)
+        elif REPO_FLAVOUR == 2:
+            return '{}/v2/_catalog'.format(REPOADDRESS)
+
+    @staticmethod
+    def delete_repo_endpoint(image_name):
+        if REPO_FLAVOUR == 1:
+            return '{}/v1/repositories/{}/{}/'.format(REPOADDRESS, NAMESPACE, image_name)
+        elif REPO_FLAVOUR == 2:
+            raise NotImplementedError()
+
+    @staticmethod
+    def delete_manifest_endpoint(image_name, manifest_digest):
+        if REPO_FLAVOUR == 1:
+            raise NotImplementedError()
+        elif REPO_FLAVOUR == 2:
+            return '{}/v2/{}/manifests/{}'.format(REPOADDRESS, image_name, manifest_digest)
 
 
 @app.route("/image/<image_name>/del", methods=['POST'])
 def del_image(image_name):
     global FOREST
-    resp = requests.delete('{}/v1/repositories/{}/{}/'.format(REPOADDRESS, NAMESPEC, image_name))
+    resp_info = {}
+    if REPO_FLAVOUR == 1:
+        resp = requests.delete(EndpointProvider.delete_repo_endpoint(image_name))
+        resp_info = resp.json()
+
+    elif REPO_FLAVOUR == 2:
+        resp = requests.get(EndpointProvider.img_detail_endpoint(image_name))
+        tags = ResponseParser.get_tags_from_img(resp, image_name)
+        for tag in tags:
+            header = {"Accept": "application/vnd.docker.distribution.manifest.v2+json"}
+            resp = requests.get(EndpointProvider.tag_image_detail_endpoint("", image_name, tag.name),
+                                headers=header)
+            manifest_digest = resp.headers['Docker-Content-Digest']
+            resp = requests.delete(EndpointProvider.delete_manifest_endpoint(image_name, manifest_digest))
+            resp_info[tag.name] = 'DELETED' if resp.status_code == 202 else 'FAILED {}'.format(resp.status_code)
 
     actions = get_common_actions()
-
+    subactions = list()
+    subactions.append(Action('/image/{}'.format(image_name), image_name, image_name))
     FOREST = OrderedDict()
 
-    return render_template('infoonly.html', info=json.dumps(resp.json(), indent=2), actions=actions)
+    return render_template('infoonly.html', info=json.dumps(resp_info, indent=2), actions=actions, subactions=subactions)
+
+@app.route("/image/<image_name>/<tag_name>/del", methods=['POST'])
+def del_tag(image_name, tag_name):
+    global FOREST
+    actions = get_common_actions()
+    subactions = list()
+    subactions.append(Action('/image/{}'.format(image_name), image_name, image_name))
+    FOREST = OrderedDict()
+    resp_info = {}
+
+    header = {"Accept": "application/vnd.docker.distribution.manifest.v2+json"}
+    resp = requests.get(EndpointProvider.tag_image_detail_endpoint("", image_name, tag_name),
+                        headers=header)
+    manifest_digest = resp.headers['Docker-Content-Digest']
+    resp = requests.delete(EndpointProvider.delete_manifest_endpoint(image_name, manifest_digest))
+    resp_info[tag_name] = 'DELETED' if resp.status_code == 202 else 'FAILED {}'.format(resp.status_code)
+
+    return render_template('infoonly.html', info=json.dumps(resp_info, indent=2), actions=actions, subactions=subactions)
 
 @app.route("/image/<image_name>", methods=['GET'])
 def img_detail(image_name):
-    resp = requests.get('{}/v1/repositories/{}/{}/tags'.format(REPOADDRESS, NAMESPEC, image_name))
+    resp = requests.get(EndpointProvider.img_detail_endpoint(image_name))
 
     actions = get_common_actions()
     subactions = list()
     subactions.append(Action('/image/{}'.format(image_name), image_name, image_name))
 
-    tags = list()
-    for tag_name, tag_id in resp.json().items():
-        tags.append(Tag(tag_name, "/image/{}/{}".format(image_name, tag_name)))
-
-    tags.sort(key=lambda x: x.name, reverse=True)
+    tags = ResponseParser.get_tags_from_img(resp, image_name)
 
     return render_template('image_page.html', info=json.dumps(resp.json(), indent=2), parent_item_name=image_name,
                            items=tags, actions=actions, subactions=subactions)
 
 @app.route("/image/<image_name>/<tag_name>", methods=['GET'])
 def tag_detail(image_name, tag_name):
-    resp = requests.get('{}/v1/repositories/{}/{}/tags/{}'.format(REPOADDRESS, NAMESPEC, image_name, tag_name))
+    resp = requests.get(EndpointProvider.tag_detail_endpoint(image_name, tag_name))
 
     actions = get_common_actions()
     subactions = list()
@@ -79,27 +161,57 @@ def tag_detail(image_name, tag_name):
 
     show_tag_id = resp.text
 
-    resp = requests.get('{}/v1/images/{}/json'.format(REPOADDRESS, show_tag_id.strip('"')))
-
+    resp = requests.get(EndpointProvider.tag_image_detail_endpoint(show_tag_id.strip('"'), image_name, tag_name))
     more_info = 'To pull use: docker pull {}/{}:{}'.format(REPOADDRESS.strip('http://'), image_name, tag_name)
 
-    return render_template('infoonly.html', info=json.dumps(resp.json(), indent=2), actions=actions,
-                           more_info=more_info, subactions=subactions)
+    return render_template('tag_info.html', info=json.dumps(resp.json(), indent=2), actions=actions,
+                           more_info=more_info, subactions=subactions, v2_repo=REPO_FLAVOUR == 2)
 
 @app.route("/list/", methods=['GET'])
 def img_list():
-    resp = requests.get('{}/v1/search'.format(REPOADDRESS))
+    resp = requests.get(EndpointProvider.image_list_endpoint())
 
     actions = get_common_actions()
 
-    images = list()
-    for image in resp.json()["results"]:
-        images.append(Image(image["name"].lstrip(NAMESPEC).lstrip('/'),
-                            "/image" + image["name"].lstrip(NAMESPEC)))
-    images.sort(key=lambda x: x.name)
+    images = ResponseParser.get_images_from_list(resp)
 
     return render_template('itemlist.html', info=json.dumps(resp.json(), indent=2), itemtype='Images',
                            items=images, actions=actions)
+
+
+class ResponseParser:
+
+    @staticmethod
+    def get_images_from_list(resp):
+        images = list()
+        if REPO_FLAVOUR == 1:
+            for image in resp.json()["results"]:
+                images.append(Image(image["name"].lstrip(NAMESPACE).lstrip('/'),
+                                    "/image" + image["name"].lstrip(NAMESPACE)))
+            images.sort(key=lambda x: x.name)
+            return images
+        if REPO_FLAVOUR == 2:
+            for image in resp.json()["repositories"]:
+                images.append(Image(image,
+                                    "/image" + '/' + image))
+            images.sort(key=lambda x: x.name)
+            return images
+
+    @staticmethod
+    def get_tags_from_img(resp, image_name):
+        tags = list()
+        if REPO_FLAVOUR == 1:
+            for tag_name, tag_id in resp.json().items():
+                tags.append(Tag(tag_name, "/image/{}/{}".format(image_name, tag_name)))
+
+            tags.sort(key=lambda x: x.name, reverse=True)
+            return tags
+        if REPO_FLAVOUR == 2:
+            print(resp.json())
+            if resp.json()['tags']:
+                for tag_name in resp.json()['tags']:
+                    tags.append(Tag(tag_name, "/image/{}/{}".format(image_name, tag_name)))
+            return tags
 
 
 @app.route("/tree/", methods=['GET'])
@@ -114,6 +226,8 @@ def tree():
         return None
 
     def merge_childs(leaf, existing_leaf):
+        if leaf.name and not existing_leaf.name:
+            existing_leaf.name = leaf.name
         for key, val in leaf.childs.items():
             if key in existing_leaf.childs.keys():
                 if val.name:
@@ -182,9 +296,9 @@ def tree():
             for tag_name, tag_id in tags_resp.json().items():
                 # this is all leaves
                 tag_image_resp = requests.get('{}/v1/images/{}/json'.format(REPOADDRESS, tag_id.strip('"')))
-                print('LEAF->', tag_name, repo["name"], tag_image_resp.json()["id"])
                 new_leaf = Leaf(tag_image_resp.json()["id"], repo["name"]+":"+tag_name, None)
-                if find_leaf(new_leaf.id):
+                existing_leaf = find_leaf(new_leaf.id)
+                if existing_leaf and existing_leaf.name == new_leaf.name:
                     continue
                 new_leaf = fit_into_forest(new_leaf)
                 add_parent(new_leaf)
@@ -196,8 +310,12 @@ def tree():
 
 @app.route("/", methods=['GET'])
 def index():
+    global REPO_FLAVOUR
 
-    resp = requests.get('{}/v1/_ping'.format(REPOADDRESS))
+    resp = requests.get(EndpointProvider.base_endpoint())
+    if resp.status_code == 404:
+        REPO_FLAVOUR = 1
+        resp = requests.get(EndpointProvider.base_endpoint())
 
     actions = get_common_actions()
 

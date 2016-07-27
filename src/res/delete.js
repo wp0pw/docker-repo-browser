@@ -1,5 +1,4 @@
 window.onload = function(e) {
-    console.log('HERE');
     var confirm_buttons = document.querySelectorAll('.confirmYesNo');
 
     for (var i = 0; i < confirm_buttons.length; i++) {
