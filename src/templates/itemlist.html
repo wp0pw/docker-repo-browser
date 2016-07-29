@@ -1,8 +1,9 @@
 {% extends "page.html" %}
 {% block content %}
-  <p>{{ itemtype }}:</p>
-  {% for item in items %}
-    <a class="itemList" href="{{ item.href }}">{{ item.name }}</a><br/><div class="clear"></div>
-  {% endfor %}
-
+  <div class="content">
+      <p>{{ itemtype }}:</p>
+      {% for item in items %}
+        <a class="itemList" href="{{ item.href }}">{{ item.name }}</a><br/><div class="clear"></div>
+      {% endfor %}
+  </div>
 {% endblock %}

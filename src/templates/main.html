@@ -1,8 +1,8 @@
 <!doctype html>
-<title>Reg</title>
-<script type="text/javascript" src="/res/CollapsibleLists.js"></script>
-<script type="text/javascript" src="/res/main.js"></script>
-<link type="text/css" href="/res/main.css" rel="stylesheet"/>
+<title>Registry</title>
+<script type="text/javascript" src="{{ url_for('static', filename='CollapsibleLists.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='main.js') }}"></script>
+<link type="text/css" href="{{ url_for('static', filename='main.css') }}" rel="stylesheet"/>
 {% block extra_headers %}{% endblock %}
 <div class=page>
   {% block body %}{% endblock %}
