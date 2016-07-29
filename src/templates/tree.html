@@ -1,0 +1,15 @@
+{% extends "page.html" %}
+{% import "helpers.html" as helpers %}
+{% block content %}
+  <br/>
+  <ul>
+    <li>
+        Images:
+        <ul class="collapsibleList collapsibleParent">
+        {% for item in items %}
+            {{ helpers.expandable_list(item, item == items[-1]) }}
+        {% endfor %}
+        </ul>
+    </li>
+  </ul>
+{% endblock %}

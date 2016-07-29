@@ -1,0 +1,20 @@
+{% extends "page.html" %}
+{% block extra_headers %}
+<script type="text/javascript" src="{{ url_for('static', filename='delete.js') }}"></script>
+{% endblock %}
+{% block content %}
+  <pre>{{ parent_item_name }}</pre><p>Tags:</p>
+  {% if items %}
+      <form action="{{ url_for('index') + request.path }}/del" method="post">
+          <div class="content">
+          {% for item in items %}
+            <a class="itemList checkbox_label float-left" href="{{ item.href }}">{{ item.name }}</a>
+            <input class="moveup float-left" type="checkbox" name="{{ item.name }}"/><div class="clear"/>
+          {% endfor %}
+          </div>
+          <p>Delete selected Tags:</p>
+          <button class="confirmYesNo" data-confirm="This will delete selected tags, you sure you want to do it?"
+                  type="submit">Delete</button>
+      </form>
+  {% endif %}
+{% endblock %}

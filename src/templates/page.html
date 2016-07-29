@@ -1,0 +1,10 @@
+{% extends "main.html" %}
+{% import "helpers.html" as helpers %}
+{% block body %}
+  {{ helpers.actions(actions) }}
+  <br/>
+  {{ helpers.actions(subactions) }}
+  <br/>
+  <br/>
+  {% block content %}{% endblock %}
+{% endblock %}

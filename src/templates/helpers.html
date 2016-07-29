@@ -1,0 +1,17 @@
+{% macro expandable_list(element, last=False) -%}
+        <li {% if last %}class="lastChild"{% endif %}>
+            {{ element.name if element.name else element.id[:10] }}
+            {% for sub_element in element.child_list %}
+                <ul>
+                {{ expandable_list(sub_element, sub_element == element.child_list[-1]) }}
+                </ul>
+            {% endfor %}
+        </li>
+{%- endmacro %}
+
+{% macro actions(elements) -%}
+  {% for action in elements %}
+    <a class="topMenu" href="{{ action.href }}">{{ action.name }}</a>
+    {% if action != elements[-1] %} <span> |</span> {% endif %}
+  {% endfor %}
+{%- endmacro %}
